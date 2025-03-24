@@ -108,9 +108,9 @@ phone-country-app/
 ```
 
 ## Дополнительно
-
+- Интерфейс: `http://localhost:8088/`
 - Swagger UI: `http://localhost:8088/swagger-ui.html`
-- Репозиторий: `https://github.com/<your-username>/phone-country-app`
+- Репозиторий: `https://github.com/andrewpolewoy/phonecountry/`
 
 Приложение поддерживает как Gradle, так и Docker, а также содержит тесты с отчетами в HTML.
 
