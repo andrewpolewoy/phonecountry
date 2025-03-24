@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Country Detector</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Phone Country Detector</h1>
+        <div class="input-group">
+            <input type="text" id="phoneNumber" placeholder="Enter phone number (e.g., +71234567890)">
+            <button onclick="detectCountry()">Detect Country</button>
+        </div>
+        <div id="result" class="result"></div>
+        <div class="examples">
+            <h3>Examples:</h3>
+            <ul>
+                <li>12423222931 → Bahamas</li>
+                <li>11165384765 → United States, Canada</li>
+                <li>71423423412 → Russia</li>
+                <li>77112227231 → Kazakhstan</li>
+            </ul>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 

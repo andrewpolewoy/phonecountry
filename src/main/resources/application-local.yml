@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/phonecountry
+#    url: jdbc:postgresql://host.docker.internal:5432/phonecountry
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+server:
+  port: 8088
+
+phone:
+  country:
+    wiki-url: https://en.wikipedia.org/wiki/List_of_telephone_country_codes#Alphabetical_order
+    connection-timeout: 5000
+    read-timeout: 5000 
