@@ -26,11 +26,10 @@ import java.util.regex.Pattern;
 @Slf4j
 public class PhoneCountryService {
 
+    private static final Pattern SUBCODE_PATTERN = Pattern.compile("\\(([^)]+)\\)");
+    final Map<String, String> countryCodeMap = new HashMap<>();
     private final CountryCodeRepository repository;
     private final PhoneCountryConfig config;
-    private static final Pattern SUBCODE_PATTERN = Pattern.compile("\\(([^)]+)\\)");
-
-    final Map<String, String> countryCodeMap = new HashMap<>();
 
     public PhoneCountryService(CountryCodeRepository repository, PhoneCountryConfig config) {
         this.repository = repository;
@@ -125,7 +124,27 @@ public class PhoneCountryService {
      * @return A string containing only digits.
      */
     public String cleanPhoneNumber(String phoneNumber) {
-        String cleanedNumber = phoneNumber.replaceAll("\\D+", "");
+        if (phoneNumber == null || phoneNumber.isBlank()) {
+            log.error("Phone number is null or empty");
+            throw new InvalidPhoneNumberException("Phone number cannot be empty");
+        }
+
+        // Разрешаем только числа, пробелы, скобки, дефисы и плюс, но плюс должен быть только в начале
+        if (!phoneNumber.matches("\\+?[0-9()\\-\\s]+")) {
+            log.error("Invalid phone number format: {}", phoneNumber);
+            throw new InvalidPhoneNumberException("Phone number contains invalid characters");
+        }
+
+        // Удаляем все символы, кроме цифр и "+"
+        String cleanedNumber = phoneNumber.replaceAll("[^\\d+]", "");
+
+        // Проверяем длину номера (7-15 цифр по E.164)
+        String digitsOnly = cleanedNumber.replace("+", "");
+        if (digitsOnly.length() < 7 || digitsOnly.length() > 15) {
+            log.error("Phone number length out of bounds: {}", cleanedNumber);
+            throw new InvalidPhoneNumberException("Phone number length must be between 7 and 15 digits");
+        }
+
         log.debug("Cleaned phone number: {} -> {}", phoneNumber, cleanedNumber);
         return cleanedNumber;
     }
@@ -148,7 +167,7 @@ public class PhoneCountryService {
         }
 
         Optional<String> bestMatch = countryCodeMap.entrySet().stream()
-                .filter(entry -> cleanNumber.startsWith(entry.getKey()))
+                .filter(entry -> cleanNumber.startsWith(entry.getKey()) || cleanNumber.startsWith("+" + entry.getKey()))
                 .max(Comparator.comparingInt(entry -> entry.getKey().length()))
                 .map(Map.Entry::getValue);
 

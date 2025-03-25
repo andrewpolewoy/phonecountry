@@ -1,5 +1,7 @@
 package ru.dsec.phonecountry.service;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -10,6 +12,8 @@ import ru.dsec.phonecountry.config.PhoneCountryConfig;
 import ru.dsec.phonecountry.exception.CountryNotFoundException;
 import ru.dsec.phonecountry.exception.InvalidPhoneNumberException;
 import ru.dsec.phonecountry.repository.CountryCodeRepository;
+
+import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -34,15 +38,35 @@ class PhoneCountryServiceTest {
     @Test
     void testCleanPhoneNumber_validInput() {
         String input = "+7 (123) 456-78-90";
-        String expected = "71234567890";
+        String expected = "+71234567890"; // Учитываем, что метод оставляет +
         assertEquals(expected, service.cleanPhoneNumber(input));
     }
 
     @Test
     void testCleanPhoneNumber_onlyNonDigits() {
         String input = "abc-xyz";
-        String expected = "";
-        assertEquals(expected, service.cleanPhoneNumber(input));
+        assertThrows(InvalidPhoneNumberException.class, () -> service.cleanPhoneNumber(input),
+                "Expected InvalidPhoneNumberException for non-numeric input");
+    }
+
+    @Test
+    void testCleanPhoneNumber_nullInput() {
+        assertThrows(InvalidPhoneNumberException.class, () -> service.cleanPhoneNumber(null),
+                "Expected InvalidPhoneNumberException for null input");
+    }
+
+    @Test
+    void testCleanPhoneNumber_tooShort() {
+        String input = "+123";
+        assertThrows(InvalidPhoneNumberException.class, () -> service.cleanPhoneNumber(input),
+                "Expected InvalidPhoneNumberException for too short number");
+    }
+
+    @Test
+    void testCleanPhoneNumber_tooLong() {
+        String input = "+1234567890123456";
+        assertThrows(InvalidPhoneNumberException.class, () -> service.cleanPhoneNumber(input),
+                "Expected InvalidPhoneNumberException for too long number");
     }
 
     @Test
@@ -105,19 +129,56 @@ class PhoneCountryServiceTest {
     }
 
     @Test
-    void testLoadCountryCodes_integration() {
+    void testLoadCountryCodes_noWikipediaAccess() throws IOException {
         when(config.getApiUrl()).thenReturn("https://en.wikipedia.org/wiki/List_of_telephone_country_codes");
         when(config.getTimeout()).thenReturn(10000);
 
-        PhoneCountryService realService = new PhoneCountryService(repository, config);
-        realService.loadCountryCodes();
+        try (var mockedJsoup = mockStatic(Jsoup.class)) {
+            // Мокаем вызов Jsoup.connect() с конкретными параметрами
+            mockedJsoup.when(() -> Jsoup.connect("https://en.wikipedia.org/wiki/List_of_telephone_country_codes"))
+                    .thenReturn(mock(org.jsoup.Connection.class));
 
-        verify(repository, atLeastOnce()).deleteAll();
-        verify(repository, atLeastOnce()).saveAll(anyList());
+            // Мокаем вызов get() на Connection, чтобы выбросить IOException
+            org.jsoup.Connection connection = mock(org.jsoup.Connection.class);
+            when(connection.timeout(10000)).thenReturn(connection);
+            when(connection.get()).thenThrow(new IOException("Network error"));
+            mockedJsoup.when(() -> Jsoup.connect("https://en.wikipedia.org/wiki/List_of_telephone_country_codes"))
+                    .thenReturn(connection);
 
-        assertTrue(realService.countryCodeMap.containsKey("1"));
-        assertTrue(realService.countryCodeMap.containsKey("7"));
-        assertTrue(realService.countryCodeMap.containsKey("77"));
-        assertEquals("Russia", realService.countryCodeMap.get("7"));
+            service.loadCountryCodes();
+
+            verify(repository, times(1)).deleteAll();
+            verify(repository, never()).saveAll(anyList());
+            assertTrue(service.countryCodeMap.isEmpty());
+        }
+    }
+
+    @Test
+    void testLoadCountryCodes_emptyTable() throws IOException {
+        when(config.getApiUrl()).thenReturn("https://en.wikipedia.org/wiki/List_of_telephone_country_codes");
+        when(config.getTimeout()).thenReturn(10000);
+
+        // Мокаем Document и его методы для симуляции пустой таблицы
+        Document mockDoc = mock(Document.class);
+        when(mockDoc.getElementById("Alphabetical_order")).thenReturn(null);
+
+        try (var mockedJsoup = mockStatic(Jsoup.class)) {
+            // Мокаем вызов Jsoup.connect() с конкретными параметрами
+            mockedJsoup.when(() -> Jsoup.connect("https://en.wikipedia.org/wiki/List_of_telephone_country_codes"))
+                    .thenReturn(mock(org.jsoup.Connection.class));
+
+            // Мокаем вызов get() на Connection, чтобы вернуть mockDoc
+            org.jsoup.Connection connection = mock(org.jsoup.Connection.class);
+            when(connection.timeout(10000)).thenReturn(connection);
+            when(connection.get()).thenReturn(mockDoc);
+            mockedJsoup.when(() -> Jsoup.connect("https://en.wikipedia.org/wiki/List_of_telephone_country_codes"))
+                    .thenReturn(connection);
+
+            service.loadCountryCodes();
+
+            verify(repository, times(1)).deleteAll();
+            verify(repository, never()).saveAll(anyList());
+            assertTrue(service.countryCodeMap.isEmpty());
+        }
     }
 }
